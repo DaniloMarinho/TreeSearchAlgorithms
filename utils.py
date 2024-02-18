@@ -42,8 +42,6 @@ class Tree:
         discounted_reward = 0
         if current_depth > 0:
             discounted_reward = (self.discount_factor ** current_depth) * random.uniform(0, reward_bound)
-
-        print(current_depth, reward_bound)
         
         root = TreeNode(random.randint(0, 100), current_depth, discounted_reward)
         for i in range(self.branching_factor):
@@ -52,7 +50,8 @@ class Tree:
             elif self.sampling == "asymetric":
                 if i < self.branching_factor-1:
                     child = self.generate_tree(depth, current_depth + 1, 0)    # 0 value
-                child = self.generate_tree(depth, current_depth + 1, reward_bound * (self.branching_factor - 1))
+                else:
+                    child = self.generate_tree(depth, current_depth + 1, reward_bound * (self.branching_factor - 1))
             if child:
                 root.add_child(child)
         return root
