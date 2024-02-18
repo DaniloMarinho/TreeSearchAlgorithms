@@ -42,13 +42,17 @@ class Tree:
         discounted_reward = 0
         if current_depth > 0:
             discounted_reward = (self.discount_factor ** current_depth) * random.uniform(0, reward_bound)
+
+        print(current_depth, reward_bound)
         
         root = TreeNode(random.randint(0, 100), current_depth, discounted_reward)
         for i in range(self.branching_factor):
             if self.sampling == "uniform":
                 child = self.generate_tree(depth, current_depth + 1, 1)
             elif self.sampling == "asymetric":
-                child = self.generate_tree(depth, current_depth + 1, 2 * i / (self.branching_factor - 1))
+                if i < self.branching_factor-1:
+                    child = self.generate_tree(depth, current_depth + 1, 0)    # 0 value
+                child = self.generate_tree(depth, current_depth + 1, reward_bound * (self.branching_factor - 1))
             if child:
                 root.add_child(child)
         return root
@@ -85,7 +89,9 @@ class Tree:
         # u_children = []
 
         # expand children and compute u value
-        for node in top_node.children:
+        # shuffling children (priority should not depen on order)
+        for idx in random.sample(list(range(self.branching_factor)), self.branching_factor):
+            node = top_node.children[idx]
             node.u = top_node.u + node.r
             node.in_S = True
             self.S.append(node)
