@@ -16,7 +16,17 @@ class TreeNode:
         self.children.append(child)
 
 class Tree:
-    def __init__(self, depth, branching_factor, n, discount_factor=0.9, make_viz=False, sampling="uniform"):
+    def __init__(self, depth, branching_factor, n, discount_factor=0.9, make_viz=False, sampling="uniform",
+                        initial_state=None, action_list=[], transition=None, watch_states=False):
+        
+        # for custom generation
+        self.initial_state = initial_state
+        self.action_list = action_list
+        self.transition = transition
+        # keeping track of states
+        self.watch_states = watch_states
+        self.state_list = []
+
         self.depth = depth
         self.branching_factor = branching_factor
         self.discount_factor = discount_factor
@@ -28,7 +38,11 @@ class Tree:
         self.T = []
 
     def initialize_root(self, depth):
-        root = self.generate_tree(depth)
+        if self.sampling == "from_transition":
+            root =  self.generate_tree_from_transition(self.initial_state, 0, self.transition, depth, 0)
+        else:
+            root = self.generate_tree(depth)
+        
         root.in_S = True
         root.u = 0
         root.b = 1
@@ -54,6 +68,23 @@ class Tree:
                     child = self.generate_tree(depth, current_depth + 1, reward_bound * (self.branching_factor - 1))
             if child:
                 root.add_child(child)
+        return root
+    
+    def generate_tree_from_transition(self, state, reward, transition, depth, current_depth=0):
+        if current_depth == depth:
+            return None
+        
+        # assign reward
+        discounted_reward = (self.discount_factor ** current_depth) * reward
+        
+        root = TreeNode(state, current_depth, discounted_reward)
+
+        for action in self.action_list:
+            next_state, next_reward = transition(state, action)
+            child = self.generate_tree_from_transition(next_state, next_reward, transition, depth, current_depth + 1)
+            if child:
+                root.add_child(child)
+
         return root
     
     def uniform_search(self):
@@ -99,6 +130,9 @@ class Tree:
         # update u value for parents recursively - do it only in the end
         # top_node.u = max(u_children)
 
+        if self.watch_states:
+            self.state_list.append(top_node.state)
+
         # move expanded node to T
         top_node.in_S = False
         self.T.append(top_node)
@@ -118,6 +152,9 @@ class Tree:
             # push new node and sort (complexity could be reduced with priority queue)
             self.S.append(node)
             self.S.sort(key=lambda x: x.b, reverse=True)
+
+        if self.watch_states:
+            self.state_list.append(top_node.state)
         
         # move expanded node to T
         top_node.in_S = False
