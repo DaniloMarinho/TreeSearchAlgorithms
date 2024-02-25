@@ -10,7 +10,6 @@ class TreeNode:
         self.b = None
         self.in_S = False    # indicator if node is in S
         self.in_T = False    # indicator if node is in T
-        # self.parent = None    # not needed if updating u values in the end
         self.children = []
 
     def add_child(self, child):
@@ -96,9 +95,6 @@ class Tree:
     def uniform_search(self):
         for i in range(self.n):
             self.expand_uniform()
-            # make visualization - use to debug with SMALL trees
-            # graph = self.to_graphviz()
-            # graph.render(f'viz/tree_{i}', format='png', cleanup=True)
         self.update_u_values(self.root)
 
         # plot after updating u values
@@ -122,19 +118,14 @@ class Tree:
             pass
 
         top_node = self.S.pop(0)
-        # u_children = []
 
         # expand children and compute u value
-        # shuffling children (priority should not depen on order)
+        # shuffling children (no tie-breaking rule)
         for idx in random.sample(list(range(self.branching_factor)), self.branching_factor):
             node = top_node.children[idx]
             node.u = top_node.u + node.r
             node.in_S = True
             self.S.append(node)
-            # u_children.append(node.u)
-        
-        # update u value for parents recursively - do it only in the end
-        # top_node.u = max(u_children)
 
         if self.watch_states:
             self.state_list.append(top_node.state)
@@ -209,8 +200,7 @@ class Tree:
     def add_nodes(self, dot, node, cum_reward = 0):
         # Define color scheme
         low_reward_color = (240, 180, 180)   # light red
-        # high_reward_color = (255, 0, 0)      # red
-        high_reward_color = (100, 0, 0)      # black
+        high_reward_color = (100, 0, 0)      # dark
 
         # Define color interpolation function
         def color_interp(reward, min_reward, max_reward, low_color, high_color):
