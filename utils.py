@@ -9,6 +9,7 @@ class TreeNode:
         self.u = None    # used to store the value u of node in S and u(n) of node in T
         self.b = None
         self.in_S = False    # indicator if node is in S
+        self.in_T = False    # indicator if node is in T
         # self.parent = None    # not needed if updating u values in the end
         self.children = []
 
@@ -16,8 +17,8 @@ class TreeNode:
         self.children.append(child)
 
 class Tree:
-    def __init__(self, depth, branching_factor, n, discount_factor=0.9, make_viz=False, sampling="uniform",
-                        initial_state=None, action_list=[], transition=None, watch_states=False):
+    def __init__(self, depth, branching_factor, n, discount_factor=0.9, make_viz=False, sampling="uniform", randomize="True",
+                        reward_bound=1, initial_state=None, action_list=[], transition=None, watch_states=False):
         
         # for custom generation
         self.initial_state = initial_state
@@ -32,6 +33,8 @@ class Tree:
         self.discount_factor = discount_factor
         self.n = n
         self.sampling = sampling
+        self.reward_bound = reward_bound
+        self.randomize = randomize
         self.root = self.initialize_root(depth)
         self.make_viz = make_viz
         self.S = [self.root]
@@ -41,13 +44,13 @@ class Tree:
         if self.sampling == "from_transition":
             root =  self.generate_tree_from_transition(self.initial_state, 0, self.transition, depth, 0)
         else:
-            root = self.generate_tree(depth)
+            root = self.generate_tree(depth, current_depth=0, reward_bound=self.reward_bound)
         
         root.in_S = True
         root.u = 0
         root.b = 1
         return root
-
+    
     def generate_tree(self, depth, current_depth=0, reward_bound=1):
         if current_depth == depth:
             return None
@@ -55,12 +58,15 @@ class Tree:
         # assign reward
         discounted_reward = 0
         if current_depth > 0:
-            discounted_reward = (self.discount_factor ** current_depth) * random.uniform(0, reward_bound)
+            if self.randomize:
+                discounted_reward = (self.discount_factor ** current_depth) * random.uniform(0, reward_bound)
+            else:
+                discounted_reward = (self.discount_factor ** current_depth) * reward_bound
         
         root = TreeNode(random.randint(0, 100), current_depth, discounted_reward)
         for i in range(self.branching_factor):
             if self.sampling == "uniform":
-                child = self.generate_tree(depth, current_depth + 1, 1)
+                child = self.generate_tree(depth, current_depth + 1, reward_bound)
             elif self.sampling == "asymetric":
                 if i < self.branching_factor-1:
                     child = self.generate_tree(depth, current_depth + 1, 0)    # 0 value
@@ -135,6 +141,7 @@ class Tree:
 
         # move expanded node to T
         top_node.in_S = False
+        top_node.in_T = True
         self.T.append(top_node)
 
     def expand_optimistic(self):
@@ -158,6 +165,7 @@ class Tree:
         
         # move expanded node to T
         top_node.in_S = False
+        top_node.in_T = True
         self.T.append(top_node)
 
 
@@ -190,10 +198,41 @@ class Tree:
         self.add_nodes(dot, self.root)
         return dot
 
-    def add_nodes(self, dot, node):
+    # def add_nodes(self, dot, node):
+    #     if node is None:
+    #         return
+    #     dot.node(str(id(node)), label=f"State: {node.state}\nDepth: {node.depth}\nReward: {node.r}\nu: {node.u}\nin_S: {node.in_S}")
+    #     for child in node.children:
+    #         self.add_nodes(dot, child)
+    #         dot.edge(str(id(node)), str(id(child)), label=f"Reward: {child.r}")
+
+    def add_nodes(self, dot, node, cum_reward = 0):
+        # Define color scheme
+        low_reward_color = (240, 180, 180)   # light red
+        # high_reward_color = (255, 0, 0)      # red
+        high_reward_color = (100, 0, 0)      # black
+
+        # Define color interpolation function
+        def color_interp(reward, min_reward, max_reward, low_color, high_color):
+            low_r, low_g, low_b = low_color
+            high_r, high_g, high_b = high_color
+            return (
+                int(low_r * (1 - (reward - min_reward) / (max_reward - min_reward)) + high_r * ((reward - min_reward) / (max_reward - min_reward))),
+                int(low_g * (1 - (reward - min_reward) / (max_reward - min_reward)) + high_g * ((reward - min_reward) / (max_reward - min_reward))),
+                int(low_b * (1 - (reward - min_reward) / (max_reward - min_reward)) + high_b * ((reward - min_reward) / (max_reward - min_reward)))
+            )
+        
+        # Find minimum and maximum rewards
+        min_reward = 0
+        max_reward = 2
+    
         if node is None:
             return
-        dot.node(str(id(node)), label=f"State: {node.state}\nDepth: {node.depth}\nReward: {node.r}\nu: {node.u}\nin_S: {node.in_S}")
+        color = '#%02x%02x%02x' % color_interp(cum_reward + node.r, min_reward, max_reward, low_reward_color, high_reward_color)
+        dot.node(str(id(node)), label=f"ΣR: {round(cum_reward + node.r, 2)}", fillcolor=color, style='filled', fontcolor='white', width="0.1")
         for child in node.children:
-            self.add_nodes(dot, child)
-            dot.edge(str(id(node)), str(id(child)), label=f"Reward: {child.r}")
+            self.add_nodes(dot, child, cum_reward + node.r)
+            edge_color = "black"
+            if node.in_T:
+                edge_color = "blue"
+            dot.edge(str(id(node)), str(id(child)), label=f"R: {round(child.r, 2)}", color = edge_color)
